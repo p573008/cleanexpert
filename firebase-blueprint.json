@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "Service": {
+      "title": "Service",
+      "description": "Cleaning service types offered",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "string" },
+        "image": { "type": "string" },
+        "category": { "type": "string" }
+      },
+      "required": ["name", "price"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Reservation for a cleaning service",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "serviceType": { "type": "string" },
+        "address": { "type": "string" },
+        "contact": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "time": { "type": "string" },
+        "hasPets": { "type": "boolean" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "totalPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "en-route", "completed", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "serviceType", "address", "contact", "date", "time", "status"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Customer feedback for services",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "content": { "type": "string" },
+        "rating": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "content", "rating"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email"]
+    }
+  },
+  "firestore": {
+    "/services/{serviceId}": {
+      "schema": "Service",
+      "description": "Core cleanup services"
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Reservations made by users"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Public customer feedback"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    }
+  }
+}

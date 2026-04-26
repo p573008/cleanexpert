@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function isAdmin() { 
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // --- Collection: Services ---
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // --- Collection: Users ---
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && 
+                      request.resource.data.role == 'user' &&
+                      request.resource.data.createdAt == request.time;
+      allow update: if isOwner(userId) && 
+                      request.resource.data.role == resource.data.role &&
+                      request.resource.data.keys().hasAll(['displayName', 'photoURL', 'updatedAt']) &&
+                      request.resource.data.keys().size() == resource.data.keys().size();
+    }
+
+    // --- Collection: Bookings ---
+    match /bookings/{bookingId} {
+      function isValidBooking(data) {
+        return data.userId == request.auth.uid &&
+               data.serviceType is string && data.serviceType.size() < 100 &&
+               data.address is string && data.address.size() < 500 &&
+               data.contact is string && data.contact.size() < 50 &&
+               data.status in ['pending', 'confirmed', 'en-route', 'completed', 'cancelled'];
+      }
+
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isOwner(resource.data.userId) || isAdmin();
+      
+      allow create: if isSignedIn() && 
+                      isValidBooking(request.resource.data) &&
+                      request.resource.data.status == 'pending' &&
+                      request.resource.data.createdAt == request.time;
+                      
+      allow update: if (isOwner(resource.data.userId) || isAdmin()) &&
+                      isValidBooking(request.resource.data) &&
+                      (
+                        // User can cancel or update basic info if still pending
+                        (isOwner(resource.data.userId) && resource.data.status == 'pending' && 
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['address', 'contact', 'date', 'time', 'status', 'updatedAt', 'options', 'totalPrice'])) ||
+                        // Admin can update status
+                        (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']))
+                      );
+    }
+
+    // --- Collection: Reviews ---
+    match /reviews/{reviewId} {
+      function isValidReview(data) {
+        return data.userId == request.auth.uid &&
+               data.userName is string &&
+               data.content is string && data.content.size() < 1000 &&
+               data.rating >= 1 && data.rating <= 5;
+      }
+
+      allow read: if true;
+      allow create: if isSignedIn() && 
+                      isValidReview(request.resource.data) &&
+                      request.resource.data.createdAt == request.time;
+      allow update, delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+  }
+}
